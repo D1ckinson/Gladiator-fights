@@ -1,11 +1,5 @@
 ﻿using System;
-using System.Web;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using static System.Net.Mime.MediaTypeNames;
-using System.Reflection;
 
 namespace Гладиаторские_бои
 {
@@ -13,32 +7,74 @@ namespace Гладиаторские_бои
     {
         static void Main()
         {
-            const char Command1 = '1';//
-            const char Command2 = '2';//
+            const char ChoeseWarriors = '1';//
+            const char ExitCommand = '2';//
 
             string playerInput;
-            char playerChar = ' ';
+            char playerChar;
             bool isRunning = true;
+
+            Dictionary<char, string> commandsDescriptions = new Dictionary<char, string>
+            {
+                { ChoeseWarriors, "Выбрать бойцов" },
+                { ExitCommand, "Выход" }
+            };
 
             Arena arena = new Arena();
 
+            Warrior[] warriors = { arena.CreateKnight(), arena.CreateMage(), arena.CreateArcher(), arena.CreatePaladin(), arena.CreateRogue() };
+
             while (isRunning)
             {
-                playerInput = Console.ReadLine();
+                Console.Clear();
 
-                playerChar = playerInput == "" ? ' ' : playerInput[0];
+                foreach (var item in commandsDescriptions)
+                    Console.WriteLine($"{item.Key} - {item.Value}");
+
+                Console.Write("Введите команду:");
+
+                //playerInput = Console.ReadLine();
+
+                // playerChar = playerInput == "" ? ' ' : playerInput[0];
+
+                Warrior warrior;
+
+                playerChar = '1';//
 
                 switch (playerChar)
                 {
-                    case Command1:
-                        //
+                    case ChoeseWarriors:
+                        warrior = ChoiceWarrior(warriors, "asd");
                         break;
 
-                    case Command2:
-                        //
+                    case ExitCommand:
+                        isRunning = false;
                         break;
                 }
             }
+        }
+
+        static Warrior ChoiceWarrior(Warrior[] warriors, string info)
+        {
+            int warriorIndex;
+
+            do
+            {
+                Console.Clear();
+                Console.WriteLine(info);
+
+                for (int i = 0; i < warriors.Length; i++)
+                    Console.WriteLine($"{i} - {warriors[i].Name}");
+
+                int.TryParse(Console.ReadLine(), out warriorIndex);
+            }
+            while (warriorIndex < 0 || warriorIndex > warriors.Length);
+
+            Warrior warrior = warriors[warriorIndex];
+
+            warriors[warriorIndex] = null;
+
+            return warriors[warriorIndex];
         }
     }
 
@@ -84,16 +120,11 @@ namespace Гладиаторские_бои
         private Rogue CreateRogue(int health, int armor, int damage) => new Rogue(health, armor, damage);
     }
 
-    interface ICastDamageBuff
-    {
-        void CastDamageBuff();
-    }
-
     interface ITakeDebuff
     {
-        void TakeDebuff();
+        void TakeDebuff(Action debuff, int debuffDuration);
 
-        void ApplyDebuff();
+        void UseDebuff();
     }
 
     abstract class Warrior
@@ -106,10 +137,7 @@ namespace Гладиаторские_бои
         protected int _baseDamage;
 
         protected int _cooldown;
-        protected int _counter;
-        protected int _debuffDuration;
-        protected bool _isIUnderDebuff = false;
-        protected Action _debuff = null;
+        protected int _counter = 0;
 
         protected Warrior(string name, int health, int armor, int damage, int cooldown)
         {
@@ -119,23 +147,55 @@ namespace Гладиаторские_бои
             _damage = damage;
             _baseDamage = damage;
             _cooldown = cooldown;
+            _counter = cooldown;
         }
 
         public void TakeDamage(int damage) => _health -= damage - (_armor / 2);
 
-        public abstract int Attack();
+        public abstract void Attack(Warrior warrior);
 
         public bool IsWarriorAlive() => _health > 0;
+    }
 
-        public void GetDebuff(Action debuff, int debuffDuration)
+    abstract class DebuffWarrior : Warrior, ITakeDebuff
+    {
+        protected int _debuffDuration;
+        protected bool _isIUnderDebuff = false;
+        protected Action _debuff = null;
+
+        public DebuffWarrior(string name, int health, int armor, int damage, int cooldown) : base(name, health, armor, damage, cooldown) { }
+
+        public override void Attack(Warrior warrior)
+        {
+            if (_isIUnderDebuff)
+                UseDebuff();
+        }
+
+        public void TakeDebuff(Action debuff, int debuffDuration)
         {
             _debuff = debuff;
             _debuffDuration = debuffDuration;
             _isIUnderDebuff = true;
         }
+
+        public void UseDebuff()
+        {
+            _debuff.Invoke();
+
+            _debuff = null;
+
+            if (_debuffDuration > 0)
+                _debuffDuration--;
+
+            if (_debuffDuration == 0 && _damage < _baseDamage)
+                _damage = _baseDamage;
+
+            if (_debuffDuration == 0)
+                _isIUnderDebuff = false;
+        }
     }
 
-    class Knight : Warrior, ITakeDebuff
+    class Knight : DebuffWarrior
     {
         private int _damageBonus;
 
@@ -144,14 +204,13 @@ namespace Гладиаторские_бои
             _damageBonus = _baseDamage / 2;
         }
 
-        public override int Attack()
+        public override void Attack(Warrior warrior)
         {
-            if (_isIUnderDebuff)
-                ApplyDebuff();
+            base.Attack(warrior);
 
             CastDamageBuff();
 
-            return _damage;
+            warrior.TakeDamage(_damage);
         }
 
         public void CastDamageBuff()
@@ -166,78 +225,149 @@ namespace Гладиаторские_бои
                 _counter++;
             }
 
-            if (_counter == 0 && _damage > _baseDamage)
+            if (_counter == 1 && _damage > _baseDamage)
                 _damage = _baseDamage;
-        }
-
-        public void TakeDebuff()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void ApplyDebuff()
-        {
-            _debuff.Invoke();
-
-            if (_debuffDuration > 0)
-                _debuffDuration--;
-
-            if (_debuffDuration == 0 && _damage < _baseDamage)
-                _damage = _baseDamage;
-
-            if (_debuffDuration == 0)
-                _isIUnderDebuff = false;
         }
     }
 
-    class Mage : Warrior
+    class Mage : DebuffWarrior
     {
-        private Random random = new Random();
+        private Random _random = new Random();
 
-        private int spellsQuantity = 3;
+        private List<Action<Warrior>> _spells = new List<Action<Warrior>>();
+        private int _spellDebuffDuration = 3;
+        private int _fireballDamage = 10;
+        private int _fireballDamageBonus = 4;
+        private int _armorBonus = 3;
 
-        public Mage(int health, int armor, int damage) : base("Маг", health, armor - 3, damage + 7, 0) { }
-
-        public override int Attack()
+        public Mage(int health, int armor, int damage) : base("Маг", health, armor - 3, 0, 0)
         {
-            throw new NotImplementedException();
+            _spells.Add(CastDebuffOnEnemy);
+            _spells.Add(FireballAttack);
+            _spells.Add(UpArmor);
         }
 
-        public void CastSpellOnEnemy(Warrior warrior)
+        public override void Attack(Warrior warrior)
         {
-            bool i = warrior is ITakeDebuff;
+            Action<Warrior> spell = _spells[_random.Next(_spells.Count)];
+
+            spell = CastDebuffOnEnemy;
+
+            spell.Invoke(warrior);
         }
 
+        private void CastDebuffOnEnemy(Warrior warrior)
+        {
+            if (warrior is ITakeDebuff)
+            {
+                ITakeDebuff debuffWarrior = warrior as ITakeDebuff;
 
+                debuffWarrior.TakeDebuff(ApplyDebuff, _spellDebuffDuration);
+            }
+            else
+            {
+                _spells.Remove(CastDebuffOnEnemy);
+            }
+        }
+
+        private void ApplyDebuff()
+        {
+            double damage = _damage;
+            damage *= 0.8;
+            _damage = (int)damage;
+        }
+
+        private void FireballAttack(Warrior warrior)
+        {
+            warrior.TakeDamage(_fireballDamage);
+
+            _fireballDamage += _fireballDamageBonus;
+        }
+
+        private void UpArmor(Warrior warrior) => _armor += _armorBonus;
     }
 
-    class Archer : Warrior
+    class Archer : DebuffWarrior
     {
+        private int _powerShotDamage = 10;
+
         public Archer(int health, int armor, int damage) : base("Лучник", health, armor, damage + 5, 2) { }
 
-        public override int Attack()
+        public override void Attack(Warrior warrior)
         {
-            throw new NotImplementedException();
+            base.Attack(warrior);
+
+            CastPowerShot(warrior);
+
+            warrior.TakeDamage(_damage);
+        }
+
+        private void CastPowerShot(Warrior warrior)
+        {
+            if (_counter == _cooldown)
+            {
+                warrior.TakeDamage(_powerShotDamage);
+                _counter = 0;
+            }
+            else
+            {
+                _counter++;
+            }
         }
     }
 
     class Paladin : Warrior
     {
-        public Paladin(int health, int armor, int damage) : base("Паладин", health + 15, armor + 10, damage - 10, 5) { }
+        private int _maxHealth;
+        private int recoveryHealthQuantity = 8;
 
-        public override int Attack()
+        public Paladin(int health, int armor, int damage) : base("Паладин", health + 15, armor + 10, damage - 10, 5)
         {
-            throw new NotImplementedException();
+            _maxHealth = health;
+        }
+
+        public override void Attack(Warrior warrior) => warrior.TakeDamage(_damage);
+
+        public new void TakeDamage(int damage)
+        {
+            if (_counter == _cooldown)
+            {
+                RecoverHealth();
+
+                _counter = 0;
+            }
+            else
+            {
+                _health -= damage - (_armor / 2);
+                _counter++;
+            }
+        }
+
+        private void RecoverHealth()
+        {
+            if (_health < _maxHealth)
+                _health += recoveryHealthQuantity;
         }
     }
 
-    class Rogue : Warrior
+    class Rogue : DebuffWarrior
     {
-        public Rogue(int health, int armor, int damage) : base("Разбойник", health - 10, armor - 5, damage + 15, 3) { }
+        private Random _random = new Random();
+        private int _maxPercent = 100;
+        private int _dodgePercent = 30;
 
-        public override int Attack()
+        public Rogue(int health, int armor, int damage) : base("Разбойник", health - 10, armor - 5, damage + 15, 0) { }
+
+        public override void Attack(Warrior warrior) => warrior.TakeDamage(_damage);
+
+        public new void TakeDamage(int damage)
         {
-            throw new NotImplementedException();
+            int Percent = _random.Next(0, _maxPercent + 1);
+
+            if (Percent <= _dodgePercent)
+                _damage++;
+            else
+                _health -= damage - (_armor / 2);
         }
     }
 }
