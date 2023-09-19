@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Гладиаторские_бои
 {
@@ -7,107 +8,143 @@ namespace Гладиаторские_бои
     {
         static void Main()
         {
-            const char ChoeseWarriors = '1';//
-            const char ExitCommand = '2';//
-
-            string playerInput;
-            char playerChar;
-            bool isRunning = true;
-
-            Dictionary<char, string> commandsDescriptions = new Dictionary<char, string>
-            {
-                { ChoeseWarriors, "Выбрать бойцов" },
-                { ExitCommand, "Выход" }
-            };
+            //Console.CursorVisible = false;
 
             Arena arena = new Arena();
+            Menu menu = new Menu(arena.StartFightAction);
+        }
+    }
 
-            Warrior[] warriors = { arena.CreateKnight(), arena.CreateMage(), arena.CreateArcher(), arena.CreatePaladin(), arena.CreateRogue() };
+    class Menu
+    {
+        const ConsoleKey DownArrow = ConsoleKey.DownArrow;
+        const ConsoleKey UpArrow = ConsoleKey.UpArrow;
+        const ConsoleKey Enter = ConsoleKey.Enter;
 
-            while (isRunning)
+        private int _menuIndex = 0;
+        private bool _isRunning;
+
+        private Dictionary<string, Action> _mainActions = new Dictionary<string, Action>();
+
+        private Dictionary<string, Func<Warrior>> _subActions = new Dictionary<string, Func<Warrior>>();
+
+        public Menu(Dictionary<string, Action> Actions)
+        {
+            _mainActions = Actions;
+
+            _mainActions.Add("Выход", Exit);
+
+            Work(_mainActions.Keys.ToArray());
+        }
+
+        public Menu(Dictionary<string, Func<Warrior>> warriorsClasses)
+        {
+            _subActions = warriorsClasses;
+
+            Work(_subActions.Keys.ToArray());
+        }
+
+        private void Work(string[] menuItems)
+        {
+            _isRunning = true;
+
+            while (_isRunning)
             {
-                Console.Clear();
+                Console.SetCursorPosition(0, 0);
 
-                foreach (var item in commandsDescriptions)
-                    Console.WriteLine($"{item.Key} - {item.Value}");
-
-                Console.Write("Введите команду:");
-
-                //playerInput = Console.ReadLine();
-
-                // playerChar = playerInput == "" ? ' ' : playerInput[0];
-
-                Warrior warrior;
-
-                playerChar = '1';//
-
-                switch (playerChar)
+                for (int i = 0; i < menuItems.Length; i++)
                 {
-                    case ChoeseWarriors:
-                        warrior = ChoiceWarrior(warriors, "asd");
-                        break;
+                    if (i == _menuIndex)
+                    {
+                        Console.BackgroundColor = ConsoleColor.White;
+                        Console.ForegroundColor = ConsoleColor.Black;
+                    }
 
-                    case ExitCommand:
-                        isRunning = false;
-                        break;
+                    Console.WriteLine(menuItems[i]);
+                    Console.ResetColor();
+                }
+
+                if (IsEnterPress(menuItems.Length - 1))
+                {
+                    if (_mainActions.ContainsKey(menuItems[_menuIndex]))
+                        _mainActions[menuItems[_menuIndex]].Invoke();
+
+                    if (_subActions.ContainsKey(menuItems[_menuIndex]))
+                        _subActions[menuItems[_menuIndex]].Invoke();
                 }
             }
         }
 
-        static Warrior ChoiceWarrior(Warrior[] warriors, string info)
+        private bool IsEnterPress(int menuLength)
         {
-            int warriorIndex;
-
-            do
+            switch (Console.ReadKey().Key)
             {
-                Console.Clear();
-                Console.WriteLine(info);
+                case DownArrow:
+                    _menuIndex++;
+                    break;
 
-                for (int i = 0; i < warriors.Length; i++)
-                    Console.WriteLine($"{i} - {warriors[i].Name}");
+                case UpArrow:
+                    _menuIndex--;
+                    break;
 
-                int.TryParse(Console.ReadLine(), out warriorIndex);
+                case Enter:
+                    return true;
             }
-            while (warriorIndex < 0 || warriorIndex > warriors.Length);
 
-            Warrior warrior = warriors[warriorIndex];
+            _menuIndex = _menuIndex > menuLength ? _menuIndex = menuLength : _menuIndex < 0 ? _menuIndex = 0 : _menuIndex;
 
-            warriors[warriorIndex] = null;
-
-            return warriors[warriorIndex];
+            return false;
         }
+
+        private void Exit() => _isRunning = false;
     }
 
     class Arena
     {
-        private readonly Random _random = new Random();
+        private Random _random = new Random();
+        private Warrior[] _opponents = new Warrior[2];
+        private Menu _menu;
 
-        private readonly int _minHealth = 80;
-        private readonly int _minArmor = 10;
-        private readonly int _minDamage = 20;
+        private int _minHealth = 80;
+        private int _minArmor = 10;
+        private int _minDamage = 20;
 
-        private readonly int _maxHealth = 100;
-        private readonly int _maxArmor = 20;
-        private readonly int _maxDamage = 30;
+        private int _maxHealth = 100;
+        private int _maxArmor = 20;
+        private int _maxDamage = 30;
 
-        public Knight CreateKnight() => (Knight)CreateWarrior(CreateKnight);
+        public readonly Dictionary<string, Action> StartFightAction = new Dictionary<string, Action>();
+        public readonly Dictionary<string, Func<Warrior>> WarriorsClasses = new Dictionary<string, Func<Warrior>>();
 
-        public Mage CreateMage(int health, int armor, int damage) => new Mage(health, armor, damage);
-
-        public Archer CreateArcher() => (Archer)CreateWarrior(CreateArcher);
-
-        public Paladin CreatePaladin() => (Paladin)CreateWarrior(CreatePaladin);
-
-        public Rogue CreateRogue() => (Rogue)CreateWarrior(CreateRogue);
-
-        private Warrior CreateWarrior(Func<int, int, int, Warrior> createFunc)
+        public Arena()
         {
-            int health = _random.Next(_minHealth, _maxHealth);
-            int armor = _random.Next(_minArmor, _maxArmor);
-            int damage = _random.Next(_minDamage, _maxDamage);
-
-            return createFunc(health, armor, damage);
+            StartFightAction.Add("Выбрать бойцов", StartFight);
+            WarriorsClasses.Add("Выбрать Рыцаря", CreateKnight);
+            WarriorsClasses.Add("Выбрать Мага", CreateKnight);
+            WarriorsClasses.Add("Выбрать Лучника", CreateKnight);
+            WarriorsClasses.Add("Выбрать Паладина", CreateKnight);
+            WarriorsClasses.Add("Выбрать Разбойника", CreateKnight);
         }
+
+        public void StartFight()
+        {
+            _menu = new Menu(WarriorsClasses);
+        }
+
+        public void ChoiceOpponent()
+        {
+
+        }
+
+        public Warrior CreateKnight() => CreateWarrior(CreateKnight);
+
+        public Warrior CreateMage() => CreateWarrior(CreateMage);
+
+        public Warrior CreateArcher() => CreateWarrior(CreateArcher);
+
+        public Warrior CreatePaladin() => CreateWarrior(CreatePaladin);
+
+        public Warrior CreateRogue() => CreateWarrior(CreateRogue);
 
         private Knight CreateKnight(int health, int armor, int damage) => new Knight(health, armor, damage);
 
@@ -118,6 +155,15 @@ namespace Гладиаторские_бои
         private Paladin CreatePaladin(int health, int armor, int damage) => new Paladin(health, armor, damage);
 
         private Rogue CreateRogue(int health, int armor, int damage) => new Rogue(health, armor, damage);
+
+        private Warrior CreateWarrior(Func<int, int, int, Warrior> createFunc)
+        {
+            int health = _random.Next(_minHealth, _maxHealth);
+            int armor = _random.Next(_minArmor, _maxArmor);
+            int damage = _random.Next(_minDamage, _maxDamage);
+
+            return createFunc(health, armor, damage);
+        }
     }
 
     interface ITakeDebuff
@@ -369,5 +415,13 @@ namespace Гладиаторские_бои
             else
                 _health -= damage - (_armor / 2);
         }
+    }
+
+    class ActionBuilder
+    {
+        private Arena _arena;
+        public ActionBuilder(Arena arena) => _arena = arena;
+
+
     }
 }
