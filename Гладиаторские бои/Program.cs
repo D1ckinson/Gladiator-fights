@@ -92,7 +92,7 @@ namespace Гладиаторские_бои
 
         public Knight CreateKnight() => (Knight)CreateWarrior(CreateKnight);
 
-        public Mage CreateMage() => (Mage)CreateWarrior(CreateMage);
+        public Mage CreateMage(int health, int armor, int damage) => new Mage(health, armor, damage);
 
         public Archer CreateArcher() => (Archer)CreateWarrior(CreateArcher);
 
