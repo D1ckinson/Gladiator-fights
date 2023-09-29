@@ -12,6 +12,8 @@ namespace Гладиаторские_бои
 
             Arena arena = new Arena();
             Menu menu = new Menu(arena.StartFightAction);
+
+            menu.MainMenuWork();
         }
     }
 
@@ -23,50 +25,48 @@ namespace Гладиаторские_бои
 
         private int _menuIndex = 0;
         private bool _isRunning;
+        private string[] _menuItems;
 
         private Dictionary<string, Action> _mainActions = new Dictionary<string, Action>();
-
         private Dictionary<string, Func<Warrior>> _subActions = new Dictionary<string, Func<Warrior>>();
 
         public Menu(Dictionary<string, Action> Actions)
         {
             _mainActions = Actions;
             _mainActions.Add("Выход", Exit);
-
-            MenuWork(_mainActions.Keys.ToArray());
+            _menuItems = _mainActions.Keys.ToArray();
         }
 
-        public Menu(Dictionary<string, Func<Warrior>> warriorsClasses, Warrior[] opponents)
+        public Menu(Dictionary<string, Func<Warrior>> warriorsClasses)
         {
             _subActions = warriorsClasses;
-
-            SubMenuWork(_subActions.Keys.ToArray(), opponents);
+            _menuItems = _subActions.Keys.ToArray();
         }
 
-        private void MenuWork(string[] menuItems)
+        public void MainMenuWork()
         {
             _isRunning = true;
 
             while (_isRunning)
             {
-                DrawMenuItems(menuItems);
+                DrawMenuItems(_menuItems);
 
-                if (IsEnterPress(menuItems.Length - 1))
-                    _mainActions[menuItems[_menuIndex]].Invoke();
+                if (IsEnterPress(_menuItems.Length - 1))
+                    _mainActions[_menuItems[_menuIndex]].Invoke();
             }
         }
 
-        private void SubMenuWork(string[] menuItems, Warrior[] opponents)
+        public void ArenaMenuWork(Warrior[] opponents)
         {
             int counter = 0;
 
             while (counter < opponents.Length)
             {
-                DrawMenuItems(menuItems);
+                DrawMenuItems(_menuItems);
 
-                if (IsEnterPress(menuItems.Length - 1))
+                if (IsEnterPress(_menuItems.Length - 1))
                 {
-                    opponents[counter] = _subActions[menuItems[_menuIndex]].Invoke();
+                    opponents[counter] = _subActions[_menuItems[_menuIndex]].Invoke();
                     Console.WriteLine($"{counter + 1} противник - {opponents[counter].Name}          ");
                     counter++;
                 }
@@ -116,20 +116,11 @@ namespace Гладиаторские_бои
 
     class Arena
     {
-        private Random _random = new Random();
-        private Warrior[] _opponents = new Warrior[2];
-        private Menu _menu;
-
-        private int _minHealth = 80;
-        private int _minArmor = 10;
-        private int _minDamage = 20;
-
-        private int _maxHealth = 100;
-        private int _maxArmor = 20;
-        private int _maxDamage = 30;
-
         public readonly Dictionary<string, Action> StartFightAction = new Dictionary<string, Action>();
         public readonly Dictionary<string, Func<Warrior>> WarriorsClasses = new Dictionary<string, Func<Warrior>>();
+
+        private Warrior[] _opponents = new Warrior[2];
+        private Menu _menu;
 
         public Arena()
         {
@@ -139,11 +130,12 @@ namespace Гладиаторские_бои
             WarriorsClasses.Add("Выбрать Лучника", CreateArcher);
             WarriorsClasses.Add("Выбрать Паладина", CreatePaladin);
             WarriorsClasses.Add("Выбрать Разбойника", CreateRogue);
+            _menu = new Menu(WarriorsClasses);
         }
 
         public void StartFight()
         {
-            _menu = new Menu(WarriorsClasses, _opponents);
+            _menu.ArenaMenuWork(_opponents);
 
             while (_opponents[0].IsWarriorAlive() && _opponents[1].IsWarriorAlive())
             {
@@ -164,34 +156,15 @@ namespace Гладиаторские_бои
             Console.Clear();
         }
 
-        public Warrior CreateKnight() => CreateWarrior(CreateKnight);
+        private Knight CreateKnight() => new Knight();
 
-        public Warrior CreateMage() => CreateWarrior(CreateMage);
+        private Mage CreateMage() => new Mage();
 
-        public Warrior CreateArcher() => CreateWarrior(CreateArcher);
+        private Archer CreateArcher() => new Archer();
 
-        public Warrior CreatePaladin() => CreateWarrior(CreatePaladin);
+        private Paladin CreatePaladin() => new Paladin();
 
-        public Warrior CreateRogue() => CreateWarrior(CreateRogue);
-
-        private Knight CreateKnight(int health, int armor, int damage) => new Knight(health, armor, damage);
-
-        private Mage CreateMage(int health, int armor, int damage) => new Mage(health, armor, damage);
-
-        private Archer CreateArcher(int health, int armor, int damage) => new Archer(health, armor, damage);
-
-        private Paladin CreatePaladin(int health, int armor, int damage) => new Paladin(health, armor, damage);
-
-        private Rogue CreateRogue(int health, int armor, int damage) => new Rogue(health, armor, damage);
-
-        private Warrior CreateWarrior(Func<int, int, int, Warrior> createFunc)
-        {
-            int health = _random.Next(_minHealth, _maxHealth);
-            int armor = _random.Next(_minArmor, _maxArmor);
-            int damage = _random.Next(_minDamage, _maxDamage);
-
-            return createFunc(health, armor, damage);
-        }
+        private Rogue CreateRogue() => new Rogue();
 
         private void AttackOpponent(Warrior warrior1, Warrior warrior2)
         {
@@ -214,18 +187,20 @@ namespace Гладиаторские_бои
         protected int _health;
         protected int _armor;
         protected int _damage;
-        protected int _baseDamage;
-
         protected int _cooldown;
         protected int _counter = 0;
 
-        protected Warrior(string name, int health, int armor, int damage, int cooldown)
+        private Random _random = new Random();
+        private int[] _healthStats = { 80, 100 };
+        private int[] _armorStats = { 10, 20 };
+        private int[] _damageStats = { 20, 30 };
+
+        protected Warrior(string name, int cooldown)
         {
             Name = name;
-            _health = health;
-            _armor = armor;
-            _damage = damage;
-            _baseDamage = damage;
+            _health = _random.Next(_healthStats[0], _healthStats[1]);
+            _armor = _random.Next(_armorStats[0], _armorStats[1]);
+            _damage = _random.Next(_damageStats[0], _damageStats[1]);
             _cooldown = cooldown;
             _counter = cooldown;
         }
@@ -239,10 +214,12 @@ namespace Гладиаторские_бои
 
     abstract class DebuffWarrior : Warrior, ITakeDebuff
     {
+        protected int _baseDamage;
         protected int _debuffDuration;
         protected Action _debuff = null;
 
-        public DebuffWarrior(string name, int health, int armor, int damage, int cooldown) : base(name, health, armor, damage, cooldown) { }
+        public DebuffWarrior(string name, int cooldown) : base(name, cooldown) =>
+            _baseDamage = _damage;
 
         public bool IsIUnderDebuff { get; private set; }
 
@@ -280,8 +257,12 @@ namespace Гладиаторские_бои
     {
         private int _damageBonus;
 
-        public Knight(int health, int armor, int damage) : base("Рыцарь", health + 10, armor + 5, damage, 3) =>
+        public Knight() : base("Рыцарь", 3)
+        {
+            _health += 10;
+            _armor += 5;
             _damageBonus = _baseDamage / 2;
+        }
 
         public override void Attack(Warrior warrior)
         {
@@ -316,15 +297,15 @@ namespace Гладиаторские_бои
     class Mage : DebuffWarrior
     {
         private Random _random = new Random();
-
         private List<Action<Warrior>> _spells = new List<Action<Warrior>>();
         private int _spellDebuffDuration = 3;
         private int _fireballDamage = 10;
         private int _fireballDamageBonus = 4;
         private int _armorBonus = 3;
 
-        public Mage(int health, int armor, int damage) : base("Маг", health, armor - 3, 0, 0)
+        public Mage() : base("Маг", 0)
         {
+            _armor -= 3;
             _spells.Add(CastDebuffOnEnemy);
             _spells.Add(FireballAttack);
             _spells.Add(UpArmor);
@@ -381,7 +362,8 @@ namespace Гладиаторские_бои
     {
         private int _powerShotDamage = 10;
 
-        public Archer(int health, int armor, int damage) : base("Лучник", health, armor, damage + 5, 2) { }
+        public Archer() : base("Лучник", 2) =>
+            _damage += 5;
 
         public override void Attack(Warrior warrior)
         {
@@ -413,8 +395,13 @@ namespace Гладиаторские_бои
         private int _maxHealth;
         private int recoveryHealthQuantity = 8;
 
-        public Paladin(int health, int armor, int damage) : base("Паладин", health + 15, armor + 10, damage - 10, 5) =>
-            _maxHealth = health;
+        public Paladin() : base("Паладин", 5)
+        {
+            _health += 15;
+            _armor += 10;
+            _damage -= 10;
+            _maxHealth = _health;
+        }
 
         public override void Attack(Warrior warrior)
         {
@@ -451,7 +438,12 @@ namespace Гладиаторские_бои
         private int _maxPercent = 100;
         private int _dodgePercent = 30;
 
-        public Rogue(int health, int armor, int damage) : base("Разбойник", health - 10, armor - 5, damage + 15, 0) { }
+        public Rogue() : base("Разбойник", 0)
+        {
+            _health -= 10;
+            _armor -= 5;
+            _damage += 15;
+        }
 
         public override void Attack(Warrior warrior)
         {
@@ -466,7 +458,7 @@ namespace Гладиаторские_бои
             if (Percent <= _dodgePercent)
             {
                 _damage++;
-                Console.WriteLine($"{Name} уворачивается от атаки и увеличивает свой урон");
+                Console.WriteLine($"{Name} уклоняется от атаки и увеличивает свой урон");
             }
             else
             {
