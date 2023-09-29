@@ -1,4 +1,6 @@
-﻿using System;
+﻿using MathNet.Numerics;
+using NPOI.Util;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -11,102 +13,105 @@ namespace Гладиаторские_бои
             Console.CursorVisible = false;
 
             Arena arena = new Arena();
-            Menu menu = new Menu(arena.StartFightAction);
+            Dictionary<string, Action> actions = new Dictionary<string, Action> { { "Начать бой", arena.Fight } };
+            Menu menu = new Menu(actions);
 
-            menu.MainMenuWork();
+            menu.Work();
         }
     }
 
     class Menu
     {
-        const ConsoleKey DownArrow = ConsoleKey.DownArrow;
-        const ConsoleKey UpArrow = ConsoleKey.UpArrow;
-        const ConsoleKey Enter = ConsoleKey.Enter;
+        const ConsoleKey MoveSelectionUp = ConsoleKey.UpArrow;
+        const ConsoleKey MoveSelectionDown = ConsoleKey.DownArrow;
+        const ConsoleKey ConfirmSelection = ConsoleKey.Enter;
 
-        private int _menuIndex = 0;
+        private int _index = 0;
         private bool _isRunning;
-        private string[] _menuItems;
+        private string[] _items;
 
-        private Dictionary<string, Action> _mainActions = new Dictionary<string, Action>();
-        private Dictionary<string, Func<Warrior>> _subActions = new Dictionary<string, Func<Warrior>>();
+        private Dictionary<string, Action> _actions = new Dictionary<string, Action>();
+        private Dictionary<string, Func<Warrior>> _arenaActions = new Dictionary<string, Func<Warrior>>();
 
         public Menu(Dictionary<string, Action> Actions)
         {
-            _mainActions = Actions;
-            _mainActions.Add("Выход", Exit);
-            _menuItems = _mainActions.Keys.ToArray();
+            _actions = Actions;
+            _actions.Add("Выход", Exit);
+            _items = _actions.Keys.ToArray();
         }
 
         public Menu(Dictionary<string, Func<Warrior>> warriorsClasses)
         {
-            _subActions = warriorsClasses;
-            _menuItems = _subActions.Keys.ToArray();
+            _arenaActions = warriorsClasses;
+            _items = _arenaActions.Keys.ToArray();
         }
 
-        public void MainMenuWork()
+        public void Work()
         {
             _isRunning = true;
 
             while (_isRunning)
             {
-                DrawMenuItems(_menuItems);
+                DrawItems();
 
-                if (IsEnterPress(_menuItems.Length - 1))
-                    _mainActions[_menuItems[_menuIndex]].Invoke();
+                if (ReadInput())
+                    _actions[_items[_index]].Invoke();
             }
         }
 
-        public void ArenaMenuWork(Warrior[] opponents)
+        public void WorkArena(Warrior[] opponents)
         {
             int counter = 0;
 
             while (counter < opponents.Length)
             {
-                DrawMenuItems(_menuItems);
+                DrawItems();
 
-                if (IsEnterPress(_menuItems.Length - 1))
+                if (ReadInput())
                 {
-                    opponents[counter] = _subActions[_menuItems[_menuIndex]].Invoke();
+                    opponents[counter] = _arenaActions[_items[_index]].Invoke();
                     Console.WriteLine($"{counter + 1} противник - {opponents[counter].Name}          ");
                     counter++;
                 }
             }
         }
 
-        private bool IsEnterPress(int menuLength)
+        private bool ReadInput()
         {
+            int lastIndex = _items.Length - 1;
+
             switch (Console.ReadKey().Key)
             {
-                case DownArrow:
-                    _menuIndex++;
+                case MoveSelectionDown:
+                    _index++;
                     break;
 
-                case UpArrow:
-                    _menuIndex--;
+                case MoveSelectionUp:
+                    _index--;
                     break;
 
-                case Enter:
+                case ConfirmSelection:
                     return true;
             }
 
-            _menuIndex = _menuIndex > menuLength ? _menuIndex = menuLength : _menuIndex < 0 ? _menuIndex = 0 : _menuIndex;
+            _index = _index > lastIndex ? _index = lastIndex : _index < 0 ? _index = 0 : _index;
 
             return false;
         }
 
-        private void DrawMenuItems(string[] menuItems)
+        private void DrawItems()
         {
             Console.SetCursorPosition(0, 0);
 
-            for (int i = 0; i < menuItems.Length; i++)
+            for (int i = 0; i < _items.Length; i++)
             {
-                if (i == _menuIndex)
+                if (i == _index)
                 {
                     Console.BackgroundColor = ConsoleColor.White;
                     Console.ForegroundColor = ConsoleColor.Black;
                 }
 
-                Console.WriteLine(menuItems[i]);
+                Console.WriteLine(_items[i]);
                 Console.ResetColor();
             }
         }
@@ -116,26 +121,28 @@ namespace Гладиаторские_бои
 
     class Arena
     {
-        public readonly Dictionary<string, Action> StartFightAction = new Dictionary<string, Action>();
-        public readonly Dictionary<string, Func<Warrior>> WarriorsClasses = new Dictionary<string, Func<Warrior>>();
-
         private Warrior[] _opponents = new Warrior[2];
         private Menu _menu;
 
         public Arena()
         {
-            StartFightAction.Add("Выбрать бойцов", StartFight);
-            WarriorsClasses.Add("Выбрать Рыцаря", CreateKnight);
-            WarriorsClasses.Add("Выбрать Мага", CreateMage);
-            WarriorsClasses.Add("Выбрать Лучника", CreateArcher);
-            WarriorsClasses.Add("Выбрать Паладина", CreatePaladin);
-            WarriorsClasses.Add("Выбрать Разбойника", CreateRogue);
+            WarriorsClasses = new Dictionary<string, Func<Warrior>>
+            {
+                { "Выбрать Рыцаря", CreateKnight },
+                { "Выбрать Мага", CreateMage },
+                { "Выбрать Лучника", CreateArcher },
+                { "Выбрать Паладина", CreatePaladin },
+                { "Выбрать Разбойника", CreateRogue }
+            };
+
             _menu = new Menu(WarriorsClasses);
         }
 
-        public void StartFight()
+        public Dictionary<string, Func<Warrior>> WarriorsClasses { get; private set; }
+
+        public void Fight()
         {
-            _menu.ArenaMenuWork(_opponents);
+            _menu.WorkArena(_opponents);
 
             while (_opponents[0].IsWarriorAlive() && _opponents[1].IsWarriorAlive())
             {
@@ -255,13 +262,16 @@ namespace Гладиаторские_бои
 
     class Knight : DebuffWarrior
     {
-        private int _damageBonus;
+        private int _damageAbilityBonus;
+        private int _healthBonus = 10;
+        private int _armorBonus = 5;
+        private int _divider = 2;
 
         public Knight() : base("Рыцарь", 3)
         {
-            _health += 10;
-            _armor += 5;
-            _damageBonus = _baseDamage / 2;
+            _health += _healthBonus;
+            _armor += _armorBonus;
+            _damageAbilityBonus = _baseDamage / _divider;
         }
 
         public override void Attack(Warrior warrior)
@@ -279,7 +289,7 @@ namespace Гладиаторские_бои
         {
             if (_counter == _cooldown)
             {
-                _damage += _damageBonus;
+                _damage += _damageAbilityBonus;
                 _counter = 0;
 
                 Console.WriteLine("Рыцарь использует усиление урона.");
@@ -301,11 +311,12 @@ namespace Гладиаторские_бои
         private int _spellDebuffDuration = 3;
         private int _fireballDamage = 10;
         private int _fireballDamageBonus = 4;
-        private int _armorBonus = 3;
+        private int _armorAbilityBonus = 3;
+        private int _armorBonus = -3;
 
         public Mage() : base("Маг", 0)
         {
-            _armor -= 3;
+            _armor += _armorBonus;
             _spells.Add(CastDebuffOnEnemy);
             _spells.Add(FireballAttack);
             _spells.Add(UpArmor);
@@ -353,7 +364,7 @@ namespace Гладиаторские_бои
 
         private void UpArmor(Warrior warrior)
         {
-            _armor += _armorBonus;
+            _armor += _armorAbilityBonus;
             Console.WriteLine($"{Name} увеличивает свою защиту");
         }
     }
@@ -361,9 +372,10 @@ namespace Гладиаторские_бои
     class Archer : DebuffWarrior
     {
         private int _powerShotDamage = 10;
+        private int _damageBonus = 5;
 
         public Archer() : base("Лучник", 2) =>
-            _damage += 5;
+            _damage += _damageBonus;
 
         public override void Attack(Warrior warrior)
         {
@@ -394,12 +406,15 @@ namespace Гладиаторские_бои
     {
         private int _maxHealth;
         private int recoveryHealthQuantity = 8;
+        private int _healthBonus = 15;
+        private int _armorBonus = 10;
+        private int _damageBonus = 10;
 
         public Paladin() : base("Паладин", 5)
         {
-            _health += 15;
-            _armor += 10;
-            _damage -= 10;
+            _health += _healthBonus;
+            _armor += _armorBonus;
+            _damage -= _damageBonus;
             _maxHealth = _health;
         }
 
@@ -420,7 +435,7 @@ namespace Гладиаторские_бои
             }
             else
             {
-                _health -= damage - (_armor / 2);
+                base.TakeDamage(damage);
                 _counter++;
             }
         }
@@ -462,7 +477,7 @@ namespace Гладиаторские_бои
             }
             else
             {
-                _health -= damage - (_armor / 2);
+                base.TakeDamage(damage);
             }
         }
     }
