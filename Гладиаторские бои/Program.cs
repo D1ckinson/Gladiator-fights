@@ -1,5 +1,4 @@
-﻿using NPOI.Util;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -189,11 +188,11 @@ namespace Гладиаторские_бои
     {
         public readonly string Name;
 
-        protected int _health;
-        protected int _armor;
-        protected int _damage;
-        protected int _cooldown;
-        protected int _counter = 0;
+        protected int Health;
+        protected int Armor;
+        protected int Damage;
+        protected int Cooldown;
+        protected int Counter = 0;
 
         private Random _random = new Random();
         private int[] _healthStats = { 80, 100 };
@@ -204,28 +203,28 @@ namespace Гладиаторские_бои
         protected Warrior(string name, int cooldown)
         {
             Name = name;
-            _health = _random.Next(_healthStats[0], _healthStats[1]);
-            _armor = _random.Next(_armorStats[0], _armorStats[1]);
-            _damage = _random.Next(_damageStats[0], _damageStats[1]);
-            _cooldown = cooldown;
-            _counter = cooldown;
+            Health = _random.Next(_healthStats[0], _healthStats[1]);
+            Armor = _random.Next(_armorStats[0], _armorStats[1]);
+            Damage = _random.Next(_damageStats[0], _damageStats[1]);
+            Cooldown = cooldown;
+            Counter = cooldown;
         }
 
-        public virtual void TakeDamage(int damage) => _health -= damage - (_armor / _armorDivider);
+        public virtual void TakeDamage(int damage) => Health -= damage - (Armor / _armorDivider);
 
         public abstract void Attack(Warrior warrior);
 
-        public bool IsWarriorAlive() => _health > 0;
+        public bool IsWarriorAlive() => Health > 0;
     }
 
     abstract class DebuffWarrior : Warrior, ITakeDebuff
     {
-        protected int _baseDamage;
-        protected int _debuffDuration;
-        protected Action _debuff = null;
+        protected int BaseDamage;
+        protected int DebuffDuration;
+        protected Action Debuff = null;
 
         public DebuffWarrior(string name, int cooldown) : base(name, cooldown) =>
-            _baseDamage = _damage;
+            BaseDamage = Damage;
 
         public bool IsIUnderDebuff { get; private set; }
 
@@ -237,24 +236,24 @@ namespace Гладиаторские_бои
 
         public void TakeDebuff(Action debuff, int debuffDuration)
         {
-            _debuff = debuff;
-            _debuffDuration = debuffDuration;
+            Debuff = debuff;
+            DebuffDuration = debuffDuration;
             IsIUnderDebuff = true;
         }
 
         public void UseDebuff()
         {
-            _debuff?.Invoke();
+            Debuff?.Invoke();
 
-            _debuff = null;
+            Debuff = null;
 
-            if (_debuffDuration > 0)
-                _debuffDuration--;
+            if (DebuffDuration > 0)
+                DebuffDuration--;
 
-            if (_debuffDuration == 0 && _damage < _baseDamage)
-                _damage = _baseDamage;
+            if (DebuffDuration == 0 && Damage < BaseDamage)
+                Damage = BaseDamage;
 
-            if (_debuffDuration == 0)
+            if (DebuffDuration == 0)
                 IsIUnderDebuff = false;
         }
     }
@@ -268,9 +267,9 @@ namespace Гладиаторские_бои
 
         public Knight() : base("Рыцарь", 3)
         {
-            _health += _healthBonus;
-            _armor += _armorBonus;
-            _damageAbilityBonus = _baseDamage / _divider;
+            Health += _healthBonus;
+            Armor += _armorBonus;
+            _damageAbilityBonus = BaseDamage / _divider;
         }
 
         public override void Attack(Warrior warrior)
@@ -279,27 +278,27 @@ namespace Гладиаторские_бои
 
             CastDamageBuff();
 
-            warrior.TakeDamage(_damage);
+            warrior.TakeDamage(Damage);
 
-            Console.WriteLine($"{Name} наносит {_damage} урона");
+            Console.WriteLine($"{Name} наносит {Damage} урона");
         }
 
         public void CastDamageBuff()
         {
-            if (_counter == _cooldown)
+            if (Counter == Cooldown)
             {
-                _damage += _damageAbilityBonus;
-                _counter = 0;
+                Damage += _damageAbilityBonus;
+                Counter = 0;
 
                 Console.WriteLine("Рыцарь использует усиление урона.");
             }
             else
             {
-                _counter++;
+                Counter++;
             }
 
-            if (_counter == 1 && _damage > _baseDamage)
-                _damage = _baseDamage;
+            if (Counter == 1 && Damage > BaseDamage)
+                Damage = BaseDamage;
         }
     }
 
@@ -316,7 +315,7 @@ namespace Гладиаторские_бои
 
         public Mage() : base("Маг", 0)
         {
-            _armor += _armorBonus;
+            Armor += _armorBonus;
             _spells.Add(CastDebuffOnEnemy);
             _spells.Add(CastFireball);
             _spells.Add(IncreaseArmor);
@@ -349,7 +348,7 @@ namespace Гладиаторские_бои
             }
         }
 
-        private void ApplyDebuff() => _damage = (int)(_damage * _debuffDamageMultiplier);
+        private void ApplyDebuff() => Damage = (int)(Damage * _debuffDamageMultiplier);
 
         private void CastFireball(Warrior warrior)
         {
@@ -361,7 +360,7 @@ namespace Гладиаторские_бои
 
         private void IncreaseArmor(Warrior warrior)
         {
-            _armor += _armorAbilityBonus;
+            Armor += _armorAbilityBonus;
             Console.WriteLine($"{Name} увеличивает свою защиту");
         }
     }
@@ -372,7 +371,7 @@ namespace Гладиаторские_бои
         private int _damageBonus = 5;
 
         public Archer() : base("Лучник", 2) =>
-            _damage += _damageBonus;
+            Damage += _damageBonus;
 
         public override void Attack(Warrior warrior)
         {
@@ -380,21 +379,21 @@ namespace Гладиаторские_бои
 
             CastPowerShot(warrior);
 
-            warrior.TakeDamage(_damage);
-            Console.WriteLine($"{Name} наносит {_damage} урона");
+            warrior.TakeDamage(Damage);
+            Console.WriteLine($"{Name} наносит {Damage} урона");
         }
 
         private void CastPowerShot(Warrior warrior)
         {
-            if (_counter == _cooldown)
+            if (Counter == Cooldown)
             {
                 warrior.TakeDamage(_powerShotDamage);
-                _counter = 0;
+                Counter = 0;
                 Console.WriteLine($"{Name} использует усиленный выстрел.");
             }
             else
             {
-                _counter++;
+                Counter++;
             }
         }
     }
@@ -409,38 +408,38 @@ namespace Гладиаторские_бои
 
         public Paladin() : base("Паладин", 5)
         {
-            _health += _healthBonus;
-            _armor += _armorBonus;
-            _damage -= _damageBonus;
-            _maxHealth = _health;
+            Health += _healthBonus;
+            Armor += _armorBonus;
+            Damage -= _damageBonus;
+            _maxHealth = Health;
         }
 
         public override void Attack(Warrior warrior)
         {
-            warrior.TakeDamage(_damage);
-            Console.WriteLine($"{Name} наносит {_damage} урона");
+            warrior.TakeDamage(Damage);
+            Console.WriteLine($"{Name} наносит {Damage} урона");
         }
 
         public override void TakeDamage(int damage)
         {
-            if (_counter == _cooldown)
+            if (Counter == Cooldown)
             {
                 RecoverHealth();
 
-                _counter = 0;
+                Counter = 0;
                 Console.WriteLine($"{Name} использует святой щит и восстанавливает здоровье.");
             }
             else
             {
                 base.TakeDamage(damage);
-                _counter++;
+                Counter++;
             }
         }
 
         private void RecoverHealth()
         {
-            if (_health < _maxHealth)
-                _health += recoveryHealthQuantity;
+            if (Health < _maxHealth)
+                Health += recoveryHealthQuantity;
         }
     }
 
@@ -455,15 +454,15 @@ namespace Гладиаторские_бои
 
         public Rogue() : base("Разбойник", 0)
         {
-            _health += _healthBonus;
-            _armor += _armorBonus;
-            _damage += _damageBonus;
+            Health += _healthBonus;
+            Armor += _armorBonus;
+            Damage += _damageBonus;
         }
 
         public override void Attack(Warrior warrior)
         {
-            warrior.TakeDamage(_damage);
-            Console.WriteLine($"{Name} наносит {_damage} урона");
+            warrior.TakeDamage(Damage);
+            Console.WriteLine($"{Name} наносит {Damage} урона");
         }
 
         public override void TakeDamage(int damage)
@@ -472,7 +471,7 @@ namespace Гладиаторские_бои
 
             if (percent <= _dodgePercent)
             {
-                _damage++;
+                Damage++;
                 Console.WriteLine($"{Name} уклоняется от атаки и увеличивает свой урон");
             }
             else
