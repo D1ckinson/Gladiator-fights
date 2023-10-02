@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NPOI.Util;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -29,16 +30,16 @@ namespace Гладиаторские_бои
         private string[] _items;
 
         private Dictionary<string, Action> _actions = new Dictionary<string, Action>();
-        private Dictionary<string, Func<Warrior>> _arenaActions = new Dictionary<string, Func<Warrior>>();
+        private IReadOnlyDictionary<string, Func<Warrior>> _arenaActions = new Dictionary<string, Func<Warrior>>();
 
-        public Menu(Dictionary<string, Action> Actions)
+        public Menu(Dictionary<string, Action> actions)
         {
-            _actions = Actions;
+            _actions = actions;
             _actions.Add("Выход", Exit);
             _items = _actions.Keys.ToArray();
         }
 
-        public Menu(Dictionary<string, Func<Warrior>> warriorsClasses)
+        public Menu(IReadOnlyDictionary<string, Func<Warrior>> warriorsClasses)
         {
             _arenaActions = warriorsClasses;
             _items = _arenaActions.Keys.ToArray();
@@ -52,7 +53,7 @@ namespace Гладиаторские_бои
             {
                 DrawItems();
 
-                if (ReadInput())
+                if (IsConfirmButtonPress())
                     _actions[_items[_index]].Invoke();
             }
         }
@@ -65,7 +66,7 @@ namespace Гладиаторские_бои
             {
                 DrawItems();
 
-                if (ReadInput())
+                if (IsConfirmButtonPress())
                 {
                     opponents[counter] = _arenaActions[_items[_index]].Invoke();
                     Console.WriteLine($"{counter + 1} противник - {opponents[counter].Name}          ");
@@ -74,7 +75,7 @@ namespace Гладиаторские_бои
             }
         }
 
-        private bool ReadInput()
+        private bool IsConfirmButtonPress()
         {
             int lastIndex = _items.Length - 1;
 
@@ -121,10 +122,11 @@ namespace Гладиаторские_бои
     {
         private Warrior[] _opponents = new Warrior[2];
         private Menu _menu;
+        private IReadOnlyDictionary<string, Func<Warrior>> _warriorsClasses;
 
         public Arena()
         {
-            WarriorsClasses = new Dictionary<string, Func<Warrior>>
+            _warriorsClasses = new Dictionary<string, Func<Warrior>>
             {
                 { "Выбрать Рыцаря", CreateKnight },
                 { "Выбрать Мага", CreateMage },
@@ -133,10 +135,8 @@ namespace Гладиаторские_бои
                 { "Выбрать Разбойника", CreateRogue }
             };
 
-            _menu = new Menu(WarriorsClasses);
+            _menu = new Menu(_warriorsClasses);
         }
-
-        public Dictionary<string, Func<Warrior>> WarriorsClasses { get; private set; }
 
         public void Fight()
         {
@@ -199,6 +199,7 @@ namespace Гладиаторские_бои
         private int[] _healthStats = { 80, 100 };
         private int[] _armorStats = { 10, 20 };
         private int[] _damageStats = { 20, 30 };
+        private int _armorDivider = 2;
 
         protected Warrior(string name, int cooldown)
         {
@@ -210,7 +211,7 @@ namespace Гладиаторские_бои
             _counter = cooldown;
         }
 
-        public virtual void TakeDamage(int damage) => _health -= damage - (_armor / 2);
+        public virtual void TakeDamage(int damage) => _health -= damage - (_armor / _armorDivider);
 
         public abstract void Attack(Warrior warrior);
 
@@ -311,13 +312,14 @@ namespace Гладиаторские_бои
         private int _fireballDamageBonus = 4;
         private int _armorAbilityBonus = 3;
         private int _armorBonus = -3;
+        private float _debuffDamageMultiplier = 0.7f;
 
         public Mage() : base("Маг", 0)
         {
             _armor += _armorBonus;
             _spells.Add(CastDebuffOnEnemy);
-            _spells.Add(FireballAttack);
-            _spells.Add(UpArmor);
+            _spells.Add(CastFireball);
+            _spells.Add(IncreaseArmor);
         }
 
         public override void Attack(Warrior warrior)
@@ -337,7 +339,9 @@ namespace Гладиаторские_бои
                     Console.WriteLine($"{Name} накладывает проклятье на противника.");
                 }
                 else
-                    FireballAttack(warrior);
+                {
+                    CastFireball(warrior);
+                }
             }
             else
             {
@@ -345,14 +349,9 @@ namespace Гладиаторские_бои
             }
         }
 
-        private void ApplyDebuff()
-        {
-            double damage = _damage;
-            damage *= 0.8;
-            _damage = (int)damage;
-        }
+        private void ApplyDebuff() => _damage = (int)(_damage * _debuffDamageMultiplier);
 
-        private void FireballAttack(Warrior warrior)
+        private void CastFireball(Warrior warrior)
         {
             warrior.TakeDamage(_fireballDamage);
 
@@ -360,7 +359,7 @@ namespace Гладиаторские_бои
             Console.WriteLine($"{Name} кидает огненный шар.");
         }
 
-        private void UpArmor(Warrior warrior)
+        private void IncreaseArmor(Warrior warrior)
         {
             _armor += _armorAbilityBonus;
             Console.WriteLine($"{Name} увеличивает свою защиту");
@@ -450,12 +449,15 @@ namespace Гладиаторские_бои
         private Random _random = new Random();
         private int _maxPercent = 100;
         private int _dodgePercent = 30;
+        private int _healthBonus = -10;
+        private int _armorBonus = -5;
+        private int _damageBonus = 15;
 
         public Rogue() : base("Разбойник", 0)
         {
-            _health -= 10;
-            _armor -= 5;
-            _damage += 15;
+            _health += _healthBonus;
+            _armor += _armorBonus;
+            _damage += _damageBonus;
         }
 
         public override void Attack(Warrior warrior)
@@ -466,9 +468,9 @@ namespace Гладиаторские_бои
 
         public override void TakeDamage(int damage)
         {
-            int Percent = _random.Next(0, _maxPercent + 1);
+            int percent = _random.Next(_maxPercent + 1);
 
-            if (Percent <= _dodgePercent)
+            if (percent <= _dodgePercent)
             {
                 _damage++;
                 Console.WriteLine($"{Name} уклоняется от атаки и увеличивает свой урон");
