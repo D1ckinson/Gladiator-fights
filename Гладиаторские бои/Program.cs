@@ -1,5 +1,4 @@
-﻿using NPOI.SS.Formula.Functions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -61,21 +60,31 @@ namespace Гладиаторские_бои
             }
         }
 
-        public void WorkArena(Warrior[] opponents)
+        public Warrior[] WorkArena(int count)
         {
-            int counter = 0;
+            Warrior[] opponents = new Warrior[count];
 
-            while (counter < opponents.Length)
+            int index = 0;
+
+            while (index < opponents.Length)
             {
                 DrawItems();
 
                 if (IsConfirmButtonPress())
                 {
-                    opponents[counter] = _arenaActions[_items[_index]].Invoke();
-                    Console.WriteLine($"{counter + 1} противник - {opponents[counter].Name}          ");
-                    counter++;
+                    opponents[index] = _arenaActions[_items[_index]].Invoke();
+                    index++;
                 }
             }
+
+            Console.WriteLine();
+
+            for (int i = 0; i < opponents.Length; i++)
+                Console.WriteLine($"{i + 1} противник - {opponents[i].Name}");
+
+            Console.WriteLine();
+
+            return opponents;
         }
 
         private bool IsConfirmButtonPress()
@@ -120,7 +129,8 @@ namespace Гладиаторские_бои
 
     class Arena
     {
-        private Warrior[] _opponents = new Warrior[2];
+        private Warrior[] _opponents;
+        private int _opponentsCount = 2;
         private Menu _menu;
         private IReadOnlyDictionary<string, Func<Warrior>> _warriorsClasses;
 
@@ -143,18 +153,19 @@ namespace Гладиаторские_бои
 
         public void Work()
         {
-            _menu.WorkArena(_opponents);
+            _opponents = new Warrior[_opponentsCount];
+            _opponents = _menu.WorkArena(_opponentsCount);
 
             Fight();
 
-            TellFightResult();
+            ShowFightResult();
 
             AskPressKey();
         }
 
         private void Fight()
         {
-            while (_opponents[0].IsWarriorAlive() && _opponents[1].IsWarriorAlive())
+            while (_opponents[0].IsAlive && _opponents[1].IsAlive)
             {
                 AttackOpponent(_opponents[0], _opponents[1]);
 
@@ -181,11 +192,11 @@ namespace Гладиаторские_бои
             System.Threading.Thread.Sleep(1000);
         }
 
-        private void TellFightResult()
+        private void ShowFightResult()
         {
-            if (_opponents[0].IsWarriorAlive() == false && _opponents[1].IsWarriorAlive() == false)
+            if (_opponents[0].IsAlive == false && _opponents[1].IsAlive == false)
                 Console.WriteLine("Войны не смогли решить кто сильнее... Оба пали в бою друг с другом.");
-            else if (_opponents[0].IsWarriorAlive())
+            else if (_opponents[0].IsAlive)
                 Console.WriteLine($"Победил {_opponents[0].Name}!");
             else
                 Console.WriteLine($"Победил {_opponents[1].Name}!");
@@ -251,6 +262,8 @@ namespace Гладиаторские_бои
             Counter = cooldown;
         }
 
+        public bool IsAlive { get { return Health > 0; } }
+
         public virtual void TakeDamage(int damage)
         {
             int armorAbsorption = (Armor / _armorDivider);
@@ -263,8 +276,6 @@ namespace Гладиаторские_бои
         }
 
         public abstract void Attack(Warrior warrior);
-
-        public bool IsWarriorAlive() => Health > 0;
 
         public void WriteStats()
         {
@@ -539,9 +550,9 @@ namespace Гладиаторские_бои
 
     static class UserUtilities
     {
-        private static Random _random = new Random();
+        private static Random _srandom = new Random();
 
-        public static int GenerateRandomNumber(int maxRandomNumber, int minRandomNumber = 0) => _random.Next(minRandomNumber, maxRandomNumber);
+        public static int GenerateRandomNumber(int maxRandomNumber, int minRandomNumber = 0) => _srandom.Next(minRandomNumber, maxRandomNumber);
 
         public static void WriteColoredText(bool isCursorMoveNextLine, string text, ConsoleColor foregroundColor, ConsoleColor backgroundColor = ConsoleColor.Black)
         {
