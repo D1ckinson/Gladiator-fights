@@ -6,7 +6,6 @@ namespace Гладиаторские_бои
 {
     internal class Program
     {
-
         static void Main()
         {
             Console.CursorVisible = false;
@@ -27,7 +26,8 @@ namespace Гладиаторские_бои
 
         private ConsoleColor[] _colorsOfSelectedItem = { ConsoleColor.Black, ConsoleColor.White };
 
-        private int _index = 0;
+        private int _itemIndex = 0;
+        private int _warriorIndex = 0;
         private bool _isRunning;
         private string[] _items;
 
@@ -55,8 +55,9 @@ namespace Гладиаторские_бои
             {
                 DrawItems();
 
-                if (IsConfirmButtonPress())
-                    _actions[_items[_index]].Invoke();
+                ReadKey();
+
+                ClampIndex();
             }
         }
 
@@ -64,53 +65,82 @@ namespace Гладиаторские_бои
         {
             Warrior[] opponents = new Warrior[count];
 
-            int index = 0;
-
-            while (index < opponents.Length)
+            while (_warriorIndex < opponents.Length)
             {
                 DrawItems();
 
-                if (IsConfirmButtonPress())
-                {
-                    opponents[index] = _arenaActions[_items[_index]].Invoke();
-                    index++;
-                }
+                ReadKey(opponents);
+
+                ClampIndex();
             }
 
             Console.WriteLine();
 
             for (int i = 0; i < opponents.Length; i++)
-                Console.WriteLine($"{i + 1} противник - {opponents[i].Name}");
+            {
+                int number = i + 1;
+
+                Console.WriteLine($"{number} противник - {opponents[i].Name}");
+            }
 
             Console.WriteLine();
 
             return opponents;
         }
 
-        private bool IsConfirmButtonPress()
+        private void ReadKey()
         {
-            int lastIndex = _items.Length - 1;
-
             switch (Console.ReadKey().Key)
             {
                 case MoveSelectionDown:
-                    _index++;
+                    _itemIndex++;
                     break;
 
                 case MoveSelectionUp:
-                    _index--;
+                    _itemIndex--;
                     break;
 
                 case ConfirmSelection:
-                    return true;
+                    _actions[_items[_itemIndex]].Invoke();
+                    break;
+            }
+        }
+
+        private Warrior ReadKey(Warrior[] warriors)
+        {
+            switch (Console.ReadKey().Key)
+            {
+                case MoveSelectionDown:
+                    _itemIndex++;
+                    break;
+
+                case MoveSelectionUp:
+                    _itemIndex--;
+                    break;
+
+                case ConfirmSelection:
+                    ActivateArenaAction(warriors);
+                    break;
             }
 
-            if (_index > lastIndex)
-                _index = lastIndex;
-            else if (_index < 0)
-                _index = 0;
+            return null;
+        }
 
-            return false;
+        private void ActivateArenaAction(Warrior[] warriors)
+        {
+            warriors[_warriorIndex] = _arenaActions[_items[_itemIndex]].Invoke();
+
+            _warriorIndex++;
+        }
+
+        private void ClampIndex()
+        {
+            int lastIndex = _items.Length - 1;
+
+            if (_itemIndex > lastIndex)
+                _itemIndex = lastIndex;
+            else if (_itemIndex < 0)
+                _itemIndex = 0;
         }
 
         private void DrawItems()
@@ -118,7 +148,7 @@ namespace Гладиаторские_бои
             Console.SetCursorPosition(0, 0);
 
             for (int i = 0; i < _items.Length; i++)
-                if (i == _index)
+                if (i == _itemIndex)
                     UserUtilities.WriteColoredText(true, _items[i], _colorsOfSelectedItem[0], _colorsOfSelectedItem[1]);
                 else
                     Console.WriteLine(_items[i]);
@@ -139,13 +169,15 @@ namespace Гладиаторские_бои
 
         public Arena()
         {
+            WarriorsFabric warriorsFabric = new WarriorsFabric();
+
             _warriorsClasses = new Dictionary<string, Func<Warrior>>
             {
-                { "Выбрать Рыцаря", CreateKnight },
-                { "Выбрать Мага", CreateMage },
-                { "Выбрать Лучника", CreateArcher },
-                { "Выбрать Паладина", CreatePaladin },
-                { "Выбрать Разбойника", CreateRogue }
+                { "Выбрать Рыцаря", warriorsFabric.CreateKnight },
+                { "Выбрать Мага", warriorsFabric.CreateMage },
+                { "Выбрать Лучника", warriorsFabric.CreateArcher },
+                { "Выбрать Паладина", warriorsFabric.CreatePaladin },
+                { "Выбрать Разбойника", warriorsFabric.CreateRogue }
             };
 
             _menu = new Menu(_warriorsClasses);
@@ -165,23 +197,16 @@ namespace Гладиаторские_бои
 
         private void Fight()
         {
-            while (_opponents[0].IsAlive && _opponents[1].IsAlive)
-            {
-                AttackOpponent(_opponents[0], _opponents[1]);
+            Warrior warrior1 = _opponents[0];
+            Warrior warrior2 = _opponents[1];
 
-                AttackOpponent(_opponents[1], _opponents[0]);
+            while (warrior1.IsAlive && warrior2.IsAlive)
+            {
+                AttackOpponent(warrior1, warrior2);
+
+                AttackOpponent(warrior2, warrior1);
             }
         }
-
-        private Knight CreateKnight() => new Knight();
-
-        private Mage CreateMage() => new Mage();
-
-        private Archer CreateArcher() => new Archer();
-
-        private Paladin CreatePaladin() => new Paladin();
-
-        private Rogue CreateRogue() => new Rogue();
 
         private void AttackOpponent(Warrior warrior1, Warrior warrior2)
         {
@@ -223,6 +248,19 @@ namespace Гладиаторские_бои
 
             Console.SetCursorPosition(cursorPositionX, cursorPositionY);
         }
+    }
+
+    class WarriorsFabric
+    {
+        public Knight CreateKnight() => new Knight();
+
+        public Mage CreateMage() => new Mage();
+
+        public Archer CreateArcher() => new Archer();
+
+        public Paladin CreatePaladin() => new Paladin();
+
+        public Rogue CreateRogue() => new Rogue();
     }
 
     interface ITakeDebuff
@@ -375,15 +413,15 @@ namespace Гладиаторские_бои
     {
         private List<Action<Warrior>> _spells = new List<Action<Warrior>>();
         private int _spellDebuffDuration = 3;
-        private int _fireballDamage = 10;
-        private int _fireballDamageBonus = 4;
-        private int _armorAbilityBonus = 4;
+        private int _damage = 15;
+        private int _fireballDamageBonus = 6;
+        private int _armorAbilityBonus = 5;
         private int _armorBonus = -3;
         private float _debuffDamageMultiplier = 0.7f;
 
         public Mage() : base("Маг", 0)
         {
-            Damage = 0;
+            Damage = _damage;
             Armor += _armorBonus;
             _spells.Add(CastDebuffOnEnemy);
             _spells.Add(CastFireball);
@@ -421,10 +459,10 @@ namespace Гладиаторские_бои
 
         private void CastFireball(Warrior warrior)
         {
-            warrior.TakeDamage(_fireballDamage);
+            warrior.TakeDamage(Damage);
 
-            _fireballDamage += _fireballDamageBonus;
-            Console.WriteLine($"{Name} кидает огненный шар и наносит {_fireballDamage} урона.");
+            Damage += _fireballDamageBonus;
+            Console.WriteLine($"{Name} кидает огненный шар и наносит {Damage} урона.");
         }
 
         private void IncreaseArmor(Warrior warrior)
